@@ -1,0 +1,10 @@
+pandas
+numpy
+requests
+scikit-learn
+joblib
+streamlit
+fyers-apiv3
+fastapi
+uvicorn[standard]
+python-dotenv

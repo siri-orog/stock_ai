@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Analysis — AI Trading Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --bg: #0a0a0b;
+    --panel: #131316;
+    --panel-alt: #1a1a1e;
+    --line: #262629;
+    --ink: #ece8e2;
+    --ink-dim: #8a8a90;
+    --ink-faint: #55555c;
+    --amber: #f5a623;
+    --amber-bg: #2b2010;
+    --buy: #3ddc84;
+    --buy-bg: #0f2419;
+    --sell: #ff5261;
+    --sell-bg: #2b1214;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--ink);
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  }
+  .num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  header {
+    display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap;
+    gap: 16px; padding: 28px 32px 20px; border-bottom: 1px solid var(--line);
+  }
+  .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em; color: var(--amber); text-transform: uppercase; margin-bottom: 6px; }
+  h1 { margin: 0; font-size: 26px; font-weight: 600; }
+  a.back { color: var(--ink-dim); font-family: 'IBM Plex Mono', monospace; font-size: 12px; text-decoration: none; border: 1px solid var(--line); padding: 6px 12px; border-radius: 4px; }
+  a.back:hover { color: var(--ink); border-color: var(--ink-dim); }
+
+  main { padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px 24px; margin-bottom: 24px; }
+  .panel h2 { margin: 0 0 16px; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-dim); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  th { color: var(--ink-faint); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
+  tr:hover td { background: var(--panel-alt); cursor: pointer; }
+  td.pos { color: var(--buy); }
+  td.neg { color: var(--sell); }
+
+  .bars { display: flex; align-items: flex-end; gap: 14px; height: 160px; padding-top: 10px; }
+  .bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; flex: 1; height: 100%; }
+  .bar { width: 100%; max-width: 42px; border-radius: 4px 4px 0 0; background: var(--amber); transition: height .3s; }
+  .bar-label { margin-top: 8px; font-size: 11px; color: var(--ink-faint); font-family: 'IBM Plex Mono', monospace; text-align: center; }
+  .bar-value { font-size: 11px; color: var(--ink-dim); font-family: 'IBM Plex Mono', monospace; margin-bottom: 4px; }
+
+  .empty { color: var(--ink-faint); font-size: 13px; padding: 20px 0; }
+  code.small { background: var(--panel-alt); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; }
+  .metric { background: var(--panel-alt); border-radius: 8px; padding: 14px 16px; }
+  .metric .v { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; }
+  .metric .l { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="eyebrow">Signal Engine — SMMA Crossover</div>
+    <h1>Daily Performance Analysis</h1>
+  </div>
+  <a class="back" href="index.html">← Back to live dashboard</a>
+</header>
+
+<main>
+
+  <div class="panel">
+    <h2>Day-by-day summary</h2>
+    <div id="perf-table"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Win rate by day</h2>
+    <div id="winrate-bars" class="bars"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>P/L by day</h2>
+    <div id="pnl-bars" class="bars"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2 id="eval-heading">Model evaluation (click a row above to load a day)</h2>
+    <div id="eval-detail"><div class="empty">No day selected yet.</div></div>
+  </div>
+
+</main>
+
+<script>
+const PERFORMANCE_URL = 'http://127.0.0.1:8000/api/performance';
+const EVALUATION_URL = (date) => `http://127.0.0.1:8000/api/evaluation/${date}`;
+
+let perfRows = [];
+
+function fmtPct(x) {
+  if (x === null || x === undefined || x === '') return '—';
+  const n = Number(x);
+  return isNaN(n) ? '—' : (n * 100).toFixed(1) + '%';
+}
+function fmtNum(x, digits = 2) {
+  if (x === null || x === undefined || x === '') return '—';
+  const n = Number(x);
+  return isNaN(n) ? '—' : n.toFixed(digits);
+}
+
+async function loadPerformance() {
+  try {
+    const res = await fetch(PERFORMANCE_URL);
+    perfRows = await res.json();
+  } catch (e) {
+    perfRows = [];
+  }
+  renderTable();
+  renderBars();
+}
+
+function renderTable() {
+  const el = document.getElementById('perf-table');
+  if (!perfRows.length) {
+    el.innerHTML = `<div class="empty">
+      No daily performance recorded yet. After a trading day closes, run:<br>
+      <code class="small">python -m ml.daily_performance --date YYYY-MM-DD</code>
+    </div>`;
+    return;
+  }
+  let html = `<table><thead><tr>
+    <th>Date</th><th>Trades</th><th>Wins</th><th>Losses</th><th>Win Rate</th>
+    <th>Total P/L</th><th>Avg P/L</th><th>Model Accuracy</th><th>Accepted (win%)</th>
+  </tr></thead><tbody>`;
+  for (const r of perfRows) {
+    const pnlClass = Number(r.total_pnl) >= 0 ? 'pos' : 'neg';
+    html += `<tr onclick="loadEvaluation('${r.trade_date}')">
+      <td class="num">${r.trade_date}</td>
+      <td class="num">${r.total_trades ?? '—'}</td>
+      <td class="num">${r.wins ?? '—'}</td>
+      <td class="num">${r.losses ?? '—'}</td>
+      <td class="num">${fmtPct(r.win_rate)}</td>
+      <td class="num ${pnlClass}">${fmtNum(r.total_pnl)}</td>
+      <td class="num">${fmtNum(r.avg_pnl)}</td>
+      <td class="num">${fmtPct(r.model_accuracy)}</td>
+      <td class="num">${r.trades_accepted_by_model ?? '—'} (${fmtPct(r.win_rate_when_accepted)})</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  el.innerHTML = html;
+}
+
+function renderBars() {
+  const winEl = document.getElementById('winrate-bars');
+  const pnlEl = document.getElementById('pnl-bars');
+  if (!perfRows.length) {
+    winEl.innerHTML = '<div class="empty">No data yet.</div>';
+    pnlEl.innerHTML = '<div class="empty">No data yet.</div>';
+    return;
+  }
+
+  winEl.innerHTML = perfRows.map(r => {
+    const pct = Math.max(0, Math.min(100, (Number(r.win_rate) || 0) * 100));
+    return `<div class="bar-col">
+      <div class="bar-value">${fmtPct(r.win_rate)}</div>
+      <div class="bar" style="height:${pct}%; background: var(--buy);"></div>
+      <div class="bar-label">${r.trade_date}</div>
+    </div>`;
+  }).join('');
+
+  const maxAbsPnl = Math.max(1, ...perfRows.map(r => Math.abs(Number(r.total_pnl) || 0)));
+  pnlEl.innerHTML = perfRows.map(r => {
+    const pnl = Number(r.total_pnl) || 0;
+    const pct = Math.max(4, Math.min(100, (Math.abs(pnl) / maxAbsPnl) * 100));
+    const color = pnl >= 0 ? 'var(--buy)' : 'var(--sell)';
+    return `<div class="bar-col">
+      <div class="bar-value">${fmtNum(pnl)}</div>
+      <div class="bar" style="height:${pct}%; background: ${color};"></div>
+      <div class="bar-label">${r.trade_date}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadEvaluation(date) {
+  document.getElementById('eval-heading').textContent = `Model evaluation — ${date}`;
+  const el = document.getElementById('eval-detail');
+  el.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const res = await fetch(EVALUATION_URL(date));
+    const r = await res.json();
+    if (r.error) {
+      el.innerHTML = `<div class="empty">${r.error}</div>`;
+      return;
+    }
+    if (!('model_accuracy' in r)) {
+      el.innerHTML = `<div class="empty">${r.note || 'No predictions logged for this date yet.'}</div>`;
+      return;
+    }
+    const cm = r.confusion_matrix || {};
+    el.innerHTML = `
+      <div class="metric-grid">
+        <div class="metric"><div class="v">${fmtPct(r.model_accuracy)}</div><div class="l">Accuracy</div></div>
+        <div class="metric"><div class="v">${fmtPct(r.model_precision)}</div><div class="l">Precision</div></div>
+        <div class="metric"><div class="v">${fmtPct(r.model_recall)}</div><div class="l">Recall</div></div>
+        <div class="metric"><div class="v">${fmtPct(r.model_f1)}</div><div class="l">F1</div></div>
+        <div class="metric"><div class="v">${r.trades_accepted_by_model}</div><div class="l">Accepted trades</div></div>
+        <div class="metric"><div class="v">${fmtPct(r.win_rate_when_accepted)}</div><div class="l">Win rate (accepted)</div></div>
+        <div class="metric"><div class="v">${r.trades_rejected_by_model}</div><div class="l">Rejected trades</div></div>
+        <div class="metric"><div class="v">${fmtPct(r.win_rate_when_rejected)}</div><div class="l">Would-have win rate (rejected)</div></div>
+      </div>
+      <h2 style="margin-top:24px;">Confusion matrix</h2>
+      <table>
+        <thead><tr><th></th><th>Predicted REJECT</th><th>Predicted ACCEPT</th></tr></thead>
+        <tbody>
+          <tr><th>Actually lost</th><td class="num">${cm.true_negative_correctly_rejected ?? '—'}</td><td class="num">${cm.false_positive_accepted_but_lost ?? '—'}</td></tr>
+          <tr><th>Actually won</th><td class="num">${cm.false_negative_rejected_but_wouldve_won ?? '—'}</td><td class="num">${cm.true_positive_correctly_accepted ?? '—'}</td></tr>
+        </tbody>
+      </table>
+    `;
+  } catch (e) {
+    el.innerHTML = '<div class="empty">Could not load evaluation (is the server running?).</div>';
+  }
+}
+
+loadPerformance();
+setInterval(loadPerformance, 30000);
+</script>
+
+</body>
+</html>

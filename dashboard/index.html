@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Trading Dashboard</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  :root {
+    --bg: #0a0a0b;
+    --panel: #131316;
+    --panel-alt: #1a1a1e;
+    --line: #262629;
+    --ink: #ece8e2;
+    --ink-dim: #8a8a90;
+    --ink-faint: #55555c;
+    --amber: #f5a623;
+    --amber-bg: #2b2010;
+    --buy: #3ddc84;
+    --buy-bg: #0f2419;
+    --sell: #ff5261;
+    --sell-bg: #2b1214;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Ticker ---------- */
+
+  .ticker {
+    overflow: hidden;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+
+  .ticker-track {
+    display: inline-flex;
+    padding: 9px 0;
+    animation: scroll-ticker 26s linear infinite;
+  }
+
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 28px;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--ink-dim);
+    border-right: 1px solid var(--line);
+  }
+
+  .ticker-item strong {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  @keyframes scroll-ticker {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  .ticker:hover .ticker-track {
+    animation-play-state: paused;
+  }
+
+  /* ---------- Header ---------- */
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .status-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+
+  /* ---------- LIVE indicator ---------- */
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--buy);
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(61,220,132,0.45);
+    }
+
+    70% {
+      box-shadow: 0 0 0 6px rgba(61,220,132,0);
+    }
+
+    100% {
+      box-shadow: 0 0 0 0 rgba(61,220,132,0);
+    }
+  }
+
+  /* ---------- Daily Analysis Button ---------- */
+
+  .analysis-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--amber);
+    background: transparent;
+    text-decoration: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    padding: 7px 12px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .analysis-link:hover {
+    color: var(--bg);
+    background: var(--amber);
+    border-color: var(--amber);
+  }
+
+  /* ---------- Search ---------- */
+
+  .search-input {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: 3px;
+    width: 150px;
+    outline: none;
+  }
+
+  .search-input:focus {
+    border-color: var(--amber);
+  }
+
+  .search-input::placeholder {
+    color: var(--ink-faint);
+  }
+
+  /* ---------- Stat strip ---------- */
+
+  .stat-strip {
+    display: flex;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+
+  .stat {
+    padding: 14px 24px 14px 0;
+    margin-right: 24px;
+    border-right: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  .stat:last-child {
+    border-right: none;
+    margin-right: 0;
+  }
+
+  .stat-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 600;
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .stat-value.buy {
+    color: var(--buy);
+  }
+
+  .stat-value.sell {
+    color: var(--sell);
+  }
+
+  .stat-value.hold {
+    color: var(--amber);
+  }
+
+  /* ---------- Screening Funnel ---------- */
+
+  .screening-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+    padding: 10px 32px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+
+  .screening-strip b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .screening-strip .liq {
+    color: var(--buy);
+  }
+
+  /* ---------- Table ---------- */
+
+  .table-wrap {
+    padding: 24px 32px 40px;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1300px;
+  }
+
+  th {
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 500;
+  }
+
+  td {
+    padding: 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+
+  tbody tr {
+    transition: background 0.15s ease;
+  }
+
+  tbody tr:hover {
+    background: var(--panel-alt);
+  }
+
+  .symbol-cell {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .buy-text {
+    color: var(--buy);
+    font-weight: 600;
+  }
+
+  .sell-text {
+    color: var(--sell);
+    font-weight: 600;
+  }
+
+  .hold-text {
+    color: var(--amber);
+    font-weight: 600;
+  }
+
+  /* ---------- Decision Badge ---------- */
+
+  .badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    font-weight: 500;
+  }
+
+  .badge.buy {
+    background: var(--buy-bg);
+    color: var(--buy);
+  }
+
+  .badge.sell {
+    background: var(--sell-bg);
+    color: var(--sell);
+  }
+
+  .badge.hold {
+    background: var(--amber-bg);
+    color: var(--amber);
+  }
+
+  /* ---------- Confidence ---------- */
+
+  .conf-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .conf-track {
+    width: 46px;
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .conf-fill {
+    height: 100%;
+    border-radius: 2px;
+  }
+
+  .reason-cell {
+    color: var(--ink-dim);
+    font-size: 12.5px;
+  }
+
+  /* ---------- Price Flash ---------- */
+
+  @keyframes flash-up {
+    0% {
+      background: rgba(61,220,132,0.28);
+    }
+
+    100% {
+      background: transparent;
+    }
+  }
+
+  @keyframes flash-down {
+    0% {
+      background: rgba(255,82,97,0.28);
+    }
+
+    100% {
+      background: transparent;
+    }
+  }
+
+  .flash-up {
+    animation: flash-up 1.1s ease;
+  }
+
+  .flash-down {
+    animation: flash-down 1.1s ease;
+  }
+
+  /* ---------- Reduced Motion ---------- */
+
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-track,
+    .live-dot {
+      animation: none;
+    }
+
+    .flash-up,
+    .flash-down {
+      animation: none;
+    }
+  }
+
+  /* ---------- Mobile ---------- */
+
+  @media (max-width: 720px) {
+
+    header {
+      padding: 20px 18px 16px;
+    }
+
+    .status-line {
+      gap: 8px;
+    }
+
+    .stat-strip {
+      padding: 0 18px;
+    }
+
+    .screening-strip {
+      padding: 10px 18px;
+    }
+
+    .table-wrap {
+      padding: 18px;
+    }
+
+    .analysis-link {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+
+    .search-input {
+      width: 130px;
+    }
+  }
+</style>
+</head>
+
+<body>
+
+<!-- =========================================================
+     LIVE TICKER
+========================================================= -->
+
+<div class="ticker">
+  <div class="ticker-track" id="ticker-track"></div>
+</div>
+
+
+<!-- =========================================================
+     HEADER
+========================================================= -->
+
+<header>
+
+  <div>
+    <div class="eyebrow">
+      Signal Engine — SMMA Crossover
+    </div>
+
+    <h1>
+      AI Trading Dashboard
+    </h1>
+  </div>
+
+
+  <div class="status-line">
+
+    <!-- LIVE STATUS -->
+    <span>
+      <span class="live-dot"></span>LIVE
+    </span>
+
+    <!-- LAST UPDATED -->
+    <span id="last-updated">
+      Updated —:—:—
+    </span>
+
+    <!-- COUNTDOWN -->
+    <span id="countdown-label">
+      Next refresh 60s
+    </span>
+
+    <!-- DAILY ANALYSIS BUTTON -->
+    <a href="analysis.html" class="analysis-link">
+      Daily Analysis →
+    </a>
+
+    <!-- SEARCH -->
+    <input
+      type="text"
+      class="search-input"
+      id="search-input"
+      placeholder="Filter symbol…"
+    >
+
+  </div>
+
+</header>
+
+
+<!-- =========================================================
+     SCREENING STATISTICS
+========================================================= -->
+
+<div class="screening-strip">
+
+  <span>
+    NSE SYMBOLS SCANNED:
+    <b id="stat-scan-total">-</b>
+  </span>
+
+  <span>
+    LTP PASS (₹30-500):
+    <b id="stat-scan-ltp">-</b>
+  </span>
+
+  <span>
+    LIQUIDITY PASS:
+    <b class="liq" id="stat-scan-liq">-</b>
+  </span>
+
+  <span>
+    LAST SCAN:
+    <b id="stat-scan-time">-</b>
+  </span>
+
+</div>
+
+
+<!-- =========================================================
+     SIGNAL COUNTS
+========================================================= -->
+
+<div class="stat-strip">
+
+  <div class="stat">
+    <span class="stat-value" id="stat-total">
+      0
+    </span>
+
+    <span class="stat-label">
+      Tracked
+    </span>
+  </div>
+
+
+  <div class="stat">
+    <span class="stat-value buy" id="stat-buy">
+      0
+    </span>
+
+    <span class="stat-label">
+      Buy
+    </span>
+  </div>
+
+
+  <div class="stat">
+    <span class="stat-value sell" id="stat-sell">
+      0
+    </span>
+
+    <span class="stat-label">
+      Sell
+    </span>
+  </div>
+
+
+  <div class="stat">
+    <span class="stat-value hold" id="stat-hold">
+      0
+    </span>
+
+    <span class="stat-label">
+      Hold
+    </span>
+  </div>
+
+</div>
+
+
+<!-- =========================================================
+     LIVE SIGNAL TABLE
+========================================================= -->
+
+<div class="table-wrap">
+
+<table>
+
+<thead>
+
+<tr>
+
+  <th>Symbol</th>
+
+  <th>LTP</th>
+
+  <th>SMMA20</th>
+
+  <th>SMMA120</th>
+
+  <th>Bid Price</th>
+
+  <th>Bid Qty</th>
+
+  <th>Ask Price</th>
+
+  <th>Ask Qty</th>
+
+  <th>ETQ 5m</th>
+
+  <th>ETQ 20m</th>
+
+  <th>ETQ 60m</th>
+
+  <th>Avg LTP 20m</th>
+
+  <th>Avg LTP 60m</th>
+
+  <th>Signal</th>
+
+  <th>Confidence</th>
+
+  <th>Decision</th>
+
+  <th>Reason</th>
+
+</tr>
+
+</thead>
+
+
+<tbody id="table-body">
+
+</tbody>
+
+</table>
+
+</div>
+
+
+<!-- =========================================================
+     JAVASCRIPT
+========================================================= -->
+
+<script>
+
+const REFRESH_SEC = 60;
+
+
+/*
+ * Backend endpoints
+ *
+ * Start backend with:
+ *
+ * uvicorn server:app --reload --port 8000
+ */
+
+const API_URL =
+  'http://127.0.0.1:8000/api/signals';
+
+const SCREENING_URL =
+  'http://127.0.0.1:8000/api/screening';
+
+
+/* =========================================================
+   FETCH LIVE SIGNAL DATA
+========================================================= */
+
+async function fetchData() {
+
+  const res = await fetch(API_URL);
+
+  if (!res.ok) {
+    throw new Error('API ' + res.status);
+  }
+
+  const data = await res.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      'Unexpected API response shape'
+    );
+  }
+
+  return data;
+}
+
+
+/* =========================================================
+   FETCH SCREENING STATISTICS
+========================================================= */
+
+async function fetchScreeningStats() {
+
+  try {
+
+    const res =
+      await fetch(SCREENING_URL);
+
+    if (!res.ok) {
+      return;
+    }
+
+    const stats =
+      await res.json();
+
+
+    document.getElementById(
+      'stat-scan-total'
+    ).textContent =
+      stats.total_nse_symbols ?? '-';
+
+
+    document.getElementById(
+      'stat-scan-ltp'
+    ).textContent =
+      stats.ltp_pass ?? '-';
+
+
+    document.getElementById(
+      'stat-scan-liq'
+    ).textContent =
+      stats.liquidity_pass ?? '-';
+
+
+    document.getElementById(
+      'stat-scan-time'
+    ).textContent =
+      stats.last_scan_time ?? '-';
+
+  }
+
+  catch (err) {
+
+    console.error(
+      'screening stats fetch failed',
+      err
+    );
+
+  }
+}
+
+
+/* =========================================================
+   PREVIOUS DATA
+========================================================= */
+
+let previousData = {};
+
+
+/* =========================================================
+   TICKER
+========================================================= */
+
+function renderTicker(data) {
+
+  const track =
+    document.getElementById(
+      'ticker-track'
+    );
+
+
+  const html =
+    data.map(r => {
+
+      const prev =
+        previousData[r.symbol];
+
+
+      const dir =
+        prev
+          ? (
+              r.ltp > prev.ltp
+                ? 'up'
+                : r.ltp < prev.ltp
+                  ? 'down'
+                  : 'flat'
+            )
+          : 'flat';
+
+
+      const arrow =
+        dir === 'up'
+          ? '▲'
+          : dir === 'down'
+            ? '▼'
+            : '•';
+
+
+      const cls =
+        dir === 'up'
+          ? 'buy-text'
+          : dir === 'down'
+            ? 'sell-text'
+            : '';
+
+
+      return `
+        <span class="ticker-item">
+
+          <strong>
+            ${r.symbol.replace('NSE:', '')}
+          </strong>
+
+          <span class="${cls} num">
+            ${arrow} ${r.ltp.toFixed(1)}
+          </span>
+
+        </span>
+      `;
+
+    }).join('');
+
+
+  /*
+   * Duplicate ticker content
+   * for seamless scrolling.
+   */
+
+  track.innerHTML =
+    html + html;
+}
+
+
+/* =========================================================
+   DECISION CLASS
+========================================================= */
+
+function decisionClass(decision) {
+
+  if (
+    decision.includes('BUY')
+  ) {
+    return 'buy';
+  }
+
+
+  if (
+    decision.includes('SELL')
+  ) {
+    return 'sell';
+  }
+
+
+  return 'hold';
+}
+
+
+/* =========================================================
+   SIGNAL CLASS
+========================================================= */
+
+function signalClass(signal) {
+
+  if (signal === 'BUY') {
+    return 'buy-text';
+  }
+
+
+  if (signal === 'SELL') {
+    return 'sell-text';
+  }
+
+
+  return 'hold-text';
+}
+
+
+/* =========================================================
+   CONFIDENCE COLOR
+========================================================= */
+
+function confColor(signal) {
+
+  if (signal === 'BUY') {
+    return 'var(--buy)';
+  }
+
+
+  if (signal === 'SELL') {
+    return 'var(--sell)';
+  }
+
+
+  return 'var(--amber)';
+}
+
+
+/* =========================================================
+   NUMBER OR DASH
+========================================================= */
+
+function numOrDash(v) {
+
+  return (
+    typeof v === 'number'
+  )
+    ? v
+    : (v ?? '-');
+}
+
+
+/* =========================================================
+   RENDER TABLE
+========================================================= */
+
+function renderTable(data) {
+
+  const tbody =
+    document.getElementById(
+      'table-body'
+    );
+
+
+  tbody.innerHTML =
+    data.map(row => {
+
+      const prev =
+        previousData[row.symbol];
+
+
+      let flash = '';
+
+
+      if (
+        prev &&
+        prev.ltp !== row.ltp
+      ) {
+
+        flash =
+          row.ltp > prev.ltp
+            ? 'flash-up'
+            : 'flash-down';
+
+      }
+
+
+      return `
+
+        <tr>
+
+          <td class="symbol-cell">
+            ${row.symbol}
+          </td>
+
+
+          <td class="num ${flash}">
+            ${row.ltp.toFixed(1)}
+          </td>
+
+
+          <td class="num">
+            ${
+              typeof row.smma20 === 'number'
+                ? row.smma20.toFixed(1)
+                : row.smma20
+            }
+          </td>
+
+
+          <td class="num">
+            ${
+              typeof row.smma120 === 'number'
+                ? row.smma120.toFixed(1)
+                : row.smma120
+            }
+          </td>
+
+
+          <td class="num">
+            ${row.bidPrice}
+          </td>
+
+
+          <td class="num">
+            ${row.bidQty}
+          </td>
+
+
+          <td class="num">
+            ${row.askPrice}
+          </td>
+
+
+          <td class="num">
+            ${row.askQty}
+          </td>
+
+
+          <td class="num">
+            ${numOrDash(row.etq5m)}
+          </td>
+
+
+          <td class="num">
+            ${numOrDash(row.etq20m)}
+          </td>
+
+
+          <td class="num">
+            ${numOrDash(row.etq60m)}
+          </td>
+
+
+          <td class="num">
+            ${numOrDash(row.avgLtp20m)}
+          </td>
+
+
+          <td class="num">
+            ${numOrDash(row.avgLtp60m)}
+          </td>
+
+
+          <td class="${signalClass(row.signal)}">
+            ${row.signal}
+          </td>
+
+
+          <td>
+
+            <div class="conf-wrap">
+
+              <div class="conf-track">
+
+                <div
+                  class="conf-fill"
+                  style="
+                    width:${row.confidence * 100}%;
+                    background:${confColor(row.signal)}
+                  "
+                ></div>
+
+              </div>
+
+
+              <span class="num">
+                ${row.confidence.toFixed(2)}
+              </span>
+
+            </div>
+
+          </td>
+
+
+          <td>
+
+            <span
+              class="badge ${decisionClass(row.decision)}"
+            >
+              ${row.decision}
+            </span>
+
+          </td>
+
+
+          <td class="reason-cell">
+            ${row.reason}
+          </td>
+
+        </tr>
+
+      `;
+
+    }).join('');
+
+
+  /* ---------- Signal Counters ---------- */
+
+  document.getElementById(
+    'stat-total'
+  ).textContent =
+    data.length;
+
+
+  document.getElementById(
+    'stat-buy'
+  ).textContent =
+    data.filter(
+      r => r.signal === 'BUY'
+    ).length;
+
+
+  document.getElementById(
+    'stat-sell'
+  ).textContent =
+    data.filter(
+      r => r.signal === 'SELL'
+    ).length;
+
+
+  document.getElementById(
+    'stat-hold'
+  ).textContent =
+    data.filter(
+      r => r.signal === 'HOLD'
+    ).length;
+
+
+  /* ---------- Save previous values ---------- */
+
+  data.forEach(
+    r => previousData[r.symbol] = r
+  );
+
+
+  applyFilter();
+}
+
+
+/* =========================================================
+   SEARCH / FILTER
+========================================================= */
+
+function applyFilter() {
+
+  const q =
+    document
+      .getElementById('search-input')
+      .value
+      .trim()
+      .toUpperCase();
+
+
+  document
+    .querySelectorAll(
+      '#table-body tr'
+    )
+    .forEach(tr => {
+
+      const sym =
+        tr.querySelector(
+          '.symbol-cell'
+        ).textContent;
+
+
+      tr.style.display =
+        sym.includes(q)
+          ? ''
+          : 'none';
+
+    });
+}
+
+
+/* =========================================================
+   SEARCH EVENT
+========================================================= */
+
+document
+  .getElementById('search-input')
+  .addEventListener(
+    'input',
+    applyFilter
+  );
+
+
+/* =========================================================
+   COUNTDOWN
+========================================================= */
+
+let countdown =
+  REFRESH_SEC;
+
+
+/* =========================================================
+   MAIN REFRESH
+========================================================= */
+
+async function refresh() {
+
+  try {
+
+    const data =
+      await fetchData();
+
+
+    renderTicker(data);
+
+    renderTable(data);
+
+
+    document.getElementById(
+      'last-updated'
+    ).textContent =
+      'Updated ' +
+      new Date().toLocaleTimeString(
+        'en-IN',
+        {
+          hour12: false
+        }
+      );
+
+  }
+
+  catch (err) {
+
+    document.getElementById(
+      'last-updated'
+    ).textContent =
+      'Update failed — retrying next cycle';
+
+
+    console.error(err);
+
+  }
+
+
+  /* Screening information */
+
+  fetchScreeningStats();
+
+
+  /* Reset countdown */
+
+  countdown =
+    REFRESH_SEC;
+}
+
+
+/* =========================================================
+   ONE-SECOND TIMER
+========================================================= */
+
+setInterval(() => {
+
+  countdown =
+    Math.max(
+      0,
+      countdown - 1
+    );
+
+
+  document.getElementById(
+    'countdown-label'
+  ).textContent =
+    'Next refresh ' +
+    countdown +
+    's';
+
+
+  if (
+    countdown === 0
+  ) {
+
+    refresh();
+
+  }
+
+}, 1000);
+
+
+/* =========================================================
+   INITIAL LOAD
+========================================================= */
+
+refresh();
+
+</script>
+
+</body>
+</html>
